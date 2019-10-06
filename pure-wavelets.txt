@@ -7,15 +7,14 @@
 @package pure-wavelets
 @version 0.1.0.0
 
-module Numeric.Wavelet
-data WaveDec :: (Type -> Type) -> Nat -> Type -> Type
-[WDZ] :: {_wdDetailZ :: !a, _wdApprox :: !a} -> WaveDec v 0 a
-[WDS] :: {_wdDetailS :: !Vector v (2 ^ (n + 1)) a, _wdNext :: !WaveDec v n a} -> WaveDec v (n + 1) a
-_wdDetail :: Vector v a => WaveDec v n a -> Vector v (2 ^ n) a
-testDec :: WaveDec Vector 4 Double
-flattenWD :: Vector v a => WaveDec v n a -> Vector v (2 ^ (n + 1)) a
-haar :: forall v n a. (Vector v a, KnownNat n, Fractional a) => Vector v (2 ^ (n + 1)) a -> WaveDec v n a
-unHaar :: (Vector v a, KnownNat n, Num a) => WaveDec v n a -> Vector v (2 ^ (n + 1)) a
-haarPass :: (Vector v a, KnownNat n, Fractional a) => Vector v (2 ^ (n + 1)) a -> (Vector v (2 ^ n) a, Vector v (2 ^ n) a)
-unhaarPass :: (Vector v a, KnownNat n, Num a) => Vector v (2 ^ n) a -> Vector v (2 ^ n) a -> Vector v (2 ^ (n + 1)) a
-instance (GHC.Show.Show (v a), GHC.Show.Show a) => GHC.Show.Show (Numeric.Wavelet.WaveDec v n a)
+module Numeric.Wavelet.Discrete
+data DWD :: (Type -> Type) -> Nat -> Type -> Type
+[DWDZ] :: {_dwdDetailZ :: !a, _dwdApprox :: !a} -> DWD v 0 a
+[DWDS] :: {_dwdDetailS :: !Vector v (2 ^ (n + 1)) a, _dwdNext :: !DWD v n a} -> DWD v (n + 1) a
+dwdApprox :: DWD v n a -> a
+dwdDetail :: Vector v a => DWD v n a -> Vector v (2 ^ n) a
+flattenDWD :: Vector v a => DWD v n a -> Vector v (2 ^ (n + 1)) a
+denseDWD :: forall v n a. (KnownNat n, Vector v a) => DWD v n a -> Vector (n + 1) (Vector v (2 ^ n) a)
+haar :: forall v n a. (Vector v a, KnownNat n, Fractional a) => Vector v (2 ^ (n + 1)) a -> DWD v n a
+unHaar :: (Vector v a, KnownNat n, Num a) => DWD v n a -> Vector v (2 ^ (n + 1)) a
+instance (GHC.Show.Show (v a), GHC.Show.Show a) => GHC.Show.Show (Numeric.Wavelet.Discrete.DWD v n a)
