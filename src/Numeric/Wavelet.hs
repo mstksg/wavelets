@@ -14,7 +14,16 @@
 {-# OPTIONS_GHC -fplugin GHC.TypeLits.KnownNat.Solver #-}
 {-# OPTIONS_GHC -fplugin GHC.TypeLits.Normalise       #-}
 
-module Numeric.Wavelet where
+module Numeric.Wavelet (
+    WaveDec(..)
+  , wdApprox, wdDetail
+  , flattenWD
+  , denseWD
+  , haar
+  , unHaar
+  , itraverseDec
+  , ifoldMapDec
+  ) where
 
 import           Control.Monad
 import           Data.Finite
@@ -41,8 +50,8 @@ data WaveDec :: (Type -> Type) -> Nat -> Type -> Type where
 
 deriving instance (Show (v a), Show a) => Show (WaveDec v n a)
 
-_wdDetail :: UVG.Vector v a => WaveDec v n a -> Vector v (2 ^ n) a
-_wdDetail = \case
+wdDetail :: UVG.Vector v a => WaveDec v n a -> Vector v (2 ^ n) a
+wdDetail = \case
     WDZ d _ -> VG.singleton d
     WDS d _ -> d
 
@@ -61,7 +70,23 @@ testDec = WDS (0 :: V.Vector 16 Double)
 flattenWD :: UVG.Vector v a => WaveDec v n a -> Vector v (2 ^ (n + 1)) a
 flattenWD = \case
     WDZ d  a  -> VG.fromTuple (a, d)
+    -- whoops this is O(n^2)
     WDS ds as -> flattenWD as VG.++ ds
+
+denseWD
+    :: forall v n a. (KnownNat n, UVG.Vector v a)
+    => WaveDec v n a
+    -> V.Vector (n + 1) (Vector v (2 ^ n) a)
+denseWD = \case
+    WDZ d  _  -> VG.singleton $ VG.singleton d
+    -- whoops this is O(n^3) or something
+    WDS ds as -> (densify @_ @_ @(n - 1) <$> denseWD as) `VG.snoc` ds
+
+densify
+    :: (UVG.Vector v a, KnownNat n)
+    => Vector v (2 ^ n) a
+    -> Vector v (2 ^ (n + 1)) a
+densify xs = VG.generate $ \i -> xs `VG.index` snd (separateProduct @2 i)
 
 itraverseDec
     :: (UVG.Vector v a, UVG.Vector v b, KnownNat n, Applicative f)
@@ -74,15 +99,15 @@ itraverseDec f g = \case
     WDS ds as -> flip WDS <$> itraverseDec f g as
                           <*> itraverseVector g ds
 
-ifoldDec
+ifoldMapDec
     :: (UVG.Vector v a, KnownNat n, Monoid m)
     => (a -> m)
     -> (forall q. (KnownNat q, q <= (n + 1)) => Finite (2 ^ q) -> a -> m)
     -> WaveDec v n a
     -> m
-ifoldDec f g = \case
+ifoldMapDec f g = \case
     WDZ d  a  -> f a <> g @1 0 d
-    WDS ds as -> ifoldDec f g as <> ifoldMapVector g ds
+    WDS ds as -> ifoldMapDec f g as <> ifoldMapVector g ds
 
 haar
     :: forall v n a. (UVG.Vector v a, KnownNat n, Fractional a)
