@@ -1,0 +1,100 @@
+{-# LANGUAGE FlexibleContexts                         #-}
+{-# LANGUAGE GADTs                                    #-}
+{-# LANGUAGE KindSignatures                           #-}
+{-# LANGUAGE LambdaCase                               #-}
+{-# LANGUAGE NoStarIsType                             #-}
+{-# LANGUAGE RankNTypes                               #-}
+{-# LANGUAGE ScopedTypeVariables                      #-}
+{-# LANGUAGE StandaloneDeriving                       #-}
+{-# LANGUAGE TypeApplications                         #-}
+{-# LANGUAGE TypeFamilyDependencies                   #-}
+{-# LANGUAGE TypeInType                               #-}
+{-# LANGUAGE TypeOperators                            #-}
+{-# LANGUAGE UndecidableInstances                     #-}
+{-# LANGUAGE ViewPatterns                             #-}
+{-# OPTIONS_GHC -fplugin GHC.TypeLits.KnownNat.Solver #-}
+{-# OPTIONS_GHC -fplugin GHC.TypeLits.Normalise       #-}
+
+
+module Numeric.Wavelet.Continuous (
+    CWD(..)
+  , CWDLine(..)
+  , cwd
+  ) where
+
+import           Data.Finite
+import           Data.Maybe
+import           Data.Proxy
+import           Data.Vector.Generic.Sized (Vector)
+import           GHC.TypeNats
+import qualified Data.Vector.Generic       as UVG
+import qualified Data.Vector.Generic.Sized as VG
+import qualified Data.Vector.Sized         as V
+
+
+newtype CWD v n m a = CWD { cwdScales :: V.Vector m (CWDLine v n a) }
+  deriving Show
+
+data CWDLine v n a = CWDLine
+    { cwdlData  :: Vector v n a
+    , cwdlScale :: a                  -- ^ Scale factor, in number of ticks
+    , cwdlCoI   :: Finite (n `Div` 2 + 1)
+    }
+  deriving Show
+
+-- | Morelet continuous wavelet decomposition.
+cwd :: forall v n m a. (UVG.Vector v a, KnownNat n, KnownNat m, RealFloat a, 1 <= n)
+    => Vector v n a
+    -> CWD v n m a
+cwd xs = CWD . VG.generate $ \i ->
+      let s   = scaleOf i
+          coi = fromMaybe maxBound . packFinite . round $ sqrt 2 * s
+      in  case someNatVal (round (scaleOf i)) of
+            SomeNat p@(Proxy :: Proxy q) ->
+              let ms :: Vector v (8 * q) a
+                  ms = morletScaled p
+                  ys :: Vector v (n + (8 * q) - 1) a
+                  ys = convolve xs ms
+              in  CWDLine (VG.slice (Proxy @(4 * q)) ys) s coi
+  where
+    n = natVal (Proxy @n)
+    m = natVal (Proxy @m)
+    maxScale = fromIntegral n / (2 * sqrt 2)
+    scaleStep = log maxScale / (fromIntegral m - 1)
+    scaleOf :: Finite m -> a
+    scaleOf i = exp $ fromIntegral i * scaleStep
+
+-- | Morelet wavelet from -4 to 4
+morlet :: forall v n a. (UVG.Vector v a, KnownNat n, Floating a) => Vector v n a
+morlet = VG.generate $ \i -> f (fromIntegral i * dt - 4)
+  where
+    dt = 8 / fromIntegral (natVal (Proxy @n) - 1)
+    f x = exp(-x*x/2) * cos(5*x)
+
+morletScaled :: forall v n a p. (UVG.Vector v a, KnownNat n, Floating a) => p n -> Vector v (8 * n) a
+morletScaled _ = morlet
+
+-- morlet :: RealFloat a => a -> a -> Complex a
+-- morlet σ t = ((c * (pi ** (-4)) * exp (- t**2 / 2)) :+ 0)
+--            * (exp (0 :+ σ * t) - (κ :+ 0))
+--   where
+--     σ2 = σ ** 2
+--     c = (1 + exp (- σ2) - 2 * exp (- 3 / 4 * σ2)) ** (-1/2)
+--     κ = exp (-σ2/2)
+
+-- morseF :: (UVG.Vector v a, KnownNat n, Floating a) => a -> a -> a -> Vector v n a
+-- morseF dω p γ = VG.generate $ \((* dω) . fromIntegral->ω) -> ω ** (p*p/γ) * exp (- (ω ** γ))
+
+convolve
+    :: forall v n m a. (KnownNat n, KnownNat m, UVG.Vector v a, Num a, 1 <= n + m)
+    => Vector v n a
+    -> Vector v m a
+    -> Vector v (n + m - 1) a
+convolve x y = VG.generate $ \i -> sum $ map (go i) finites
+  where
+    go  :: Finite (n + m - 1) -> Finite n -> a
+    go n k
+      | Right j <- sub n k
+      , Just l  <- strengthenN j
+      = x `VG.index` k * y `VG.index` l
+      | otherwise = 0

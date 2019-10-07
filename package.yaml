@@ -31,6 +31,9 @@ dependencies:
 - finite-typelits
 - vector
 - ghc-typelits-knownnat
+- fft
+- carray
+- array
 - ghc-typelits-natnormalise
 - typelits-witnesses
 
