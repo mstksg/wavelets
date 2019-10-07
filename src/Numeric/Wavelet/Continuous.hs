@@ -44,8 +44,8 @@ data CWDLine v n a = CWDLine
 
 -- | Morelet continuous wavelet decomposition.
 cwd :: forall v n m a. (UVG.Vector v a, KnownNat n, KnownNat m, RealFloat a, 1 <= n)
-    => Finite (n + 1)         -- ^ minimum scale (period)
-    -> Finite (n + 1)         -- ^ maximum scale (period)
+    => Finite (n `Div` 2 + 1)         -- ^ minimum scale (period)
+    -> Finite (n `Div` 2 + 1)         -- ^ maximum scale (period)
     -> Vector v n a
     -> CWD v n m a
 cwd minS maxS xs = CWD . VG.generate $ \i ->
