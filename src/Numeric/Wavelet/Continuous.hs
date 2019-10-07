@@ -32,7 +32,7 @@ import qualified Data.Vector.Generic.Sized as VG
 import qualified Data.Vector.Sized         as V
 
 
-newtype CWD v n m a = CWD { cwdScales :: V.Vector m (CWDLine v n a) }
+newtype CWD v n m a = CWD { cwdLines :: V.Vector m (CWDLine v n a) }
   deriving Show
 
 data CWDLine v n a = CWDLine
@@ -64,9 +64,9 @@ cwd xs = CWD . VG.generate $ \i ->
     scaleOf :: Finite m -> a
     scaleOf i = exp $ fromIntegral i * scaleStep
 
--- | Morelet wavelet from -4 to 4
+-- | Morelet wavelet from -4 to 4, normalized to dt.
 morlet :: forall v n a. (UVG.Vector v a, KnownNat n, Floating a) => Vector v n a
-morlet = VG.generate $ \i -> f (fromIntegral i * dt - 4)
+morlet = VG.generate $ \i -> f (fromIntegral i * dt - 4) * dt
   where
     dt = 8 / fromIntegral (natVal (Proxy @n) - 1)
     f x = exp(-x*x/2) * cos(5*x)
