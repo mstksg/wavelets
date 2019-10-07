@@ -10,7 +10,7 @@
 module Numeric.Wavelet.Continuous
 newtype CWD v n m a
 CWD :: Vector m (CWDLine v n a) -> CWD v n m a
-[cwdScales] :: CWD v n m a -> Vector m (CWDLine v n a)
+[cwdLines] :: CWD v n m a -> Vector m (CWDLine v n a)
 data CWDLine v n a
 CWDLine :: Vector v n a -> a -> Finite ((n `Div` 2) + 1) -> CWDLine v n a
 [cwdlData] :: CWDLine v n a -> Vector v n a
