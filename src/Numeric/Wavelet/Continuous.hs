@@ -44,9 +44,11 @@ data CWDLine v n a = CWDLine
 
 -- | Morelet continuous wavelet decomposition.
 cwd :: forall v n m a. (UVG.Vector v a, KnownNat n, KnownNat m, RealFloat a, 1 <= n)
-    => Vector v n a
+    => Finite (n + 1)         -- ^ minimum scale (period)
+    -> Finite (n + 1)         -- ^ maximum scale (period)
+    -> Vector v n a
     -> CWD v n m a
-cwd xs = CWD . VG.generate $ \i ->
+cwd minS maxS xs = CWD . VG.generate $ \i ->
       let s   = scaleOf i
           coi = fromMaybe maxBound . packFinite . round $ sqrt 2 * s
       in  case someNatVal (round (scaleOf i)) of
@@ -59,10 +61,11 @@ cwd xs = CWD . VG.generate $ \i ->
   where
     n = natVal (Proxy @n)
     m = natVal (Proxy @m)
-    maxScale = fromIntegral n / (2 * sqrt 2)
-    scaleStep = log maxScale / (fromIntegral m - 1)
+    maxScale = fromIntegral maxS `min` (fromIntegral n / (2 * sqrt 2))
+    minScale = fromIntegral minS `max` 1
+    scaleStep = (log maxScale - log minScale) / (fromIntegral m - 1)
     scaleOf :: Finite m -> a
-    scaleOf i = exp $ fromIntegral i * scaleStep
+    scaleOf i = exp $ log minScale + fromIntegral i * scaleStep
 
 -- | Morelet wavelet from -4 to 4, normalized to dt.
 morlet :: forall v n a. (UVG.Vector v a, KnownNat n, Floating a) => Vector v n a
