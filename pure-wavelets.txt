@@ -7,23 +7,6 @@
 @package pure-wavelets
 @version 0.1.0.0
 
-module Numeric.Wavelet.Continuous
-newtype CWD v n m a
-CWD :: Vector m (CWDLine v n a) -> CWD v n m a
-[cwdLines] :: CWD v n m a -> Vector m (CWDLine v n a)
-data CWDLine v n a
-CWDLine :: Vector v n a -> a -> Finite ((n `Div` 2) + 1) -> CWDLine v n a
-[cwdlData] :: CWDLine v n a -> Vector v n a
-
--- | Scale factor, in number of ticks
-[cwdlScale] :: CWDLine v n a -> a
-[cwdlCoI] :: CWDLine v n a -> Finite ((n `Div` 2) + 1)
-
--- | Morelet continuous wavelet decomposition.
-cwd :: forall v n m a. (Vector v a, KnownNat n, KnownNat m, RealFloat a, 1 <= n) => Finite ((n `Div` 2) + 1) -> Finite ((n `Div` 2) + 1) -> Vector v n a -> CWD v n m a
-instance (GHC.Show.Show a, GHC.Show.Show (v a)) => GHC.Show.Show (Numeric.Wavelet.Continuous.CWD v n m a)
-instance (GHC.Show.Show a, GHC.Show.Show (v a)) => GHC.Show.Show (Numeric.Wavelet.Continuous.CWDLine v n a)
-
 module Numeric.Wavelet.Discrete
 data DWD :: (Type -> Type) -> Nat -> Type -> Type
 [DWDZ] :: {_dwdDetailZ :: !a, _dwdApprox :: !a} -> DWD v 0 a
@@ -39,3 +22,20 @@ instance (GHC.Show.Show (v a), GHC.Show.Show a) => GHC.Show.Show (Numeric.Wavele
 module Numeric.Wavelet.Internal
 fft :: (FFTWReal a, Vector v (Complex a)) => Vector v n (Complex a) -> Vector v n (Complex a)
 ifft :: (FFTWReal a, Vector v (Complex a)) => Vector v n (Complex a) -> Vector v n (Complex a)
+
+module Numeric.Wavelet.Continuous
+newtype CWD v n m a
+CWD :: Vector m (CWDLine v n a) -> CWD v n m a
+[cwdLines] :: CWD v n m a -> Vector m (CWDLine v n a)
+data CWDLine v n a
+CWDLine :: Vector v n a -> Finite ((n `Div` 2) + 1) -> Finite ((n `Div` 2) + 1) -> CWDLine v n a
+[cwdlData] :: CWDLine v n a -> Vector v n a
+
+-- | Scale factor, in number of ticks
+[cwdlScale] :: CWDLine v n a -> Finite ((n `Div` 2) + 1)
+[cwdlCoI] :: CWDLine v n a -> Finite ((n `Div` 2) + 1)
+
+-- | Morelet continuous wavelet decomposition.
+cwd :: forall v n m a. (Vector v a, Vector v (Complex a), KnownNat n, KnownNat m, FFTWReal a, 1 <= n) => Finite ((n `Div` 2) + 1) -> Finite ((n `Div` 2) + 1) -> Vector v n a -> CWD v n m a
+instance GHC.Show.Show (v a) => GHC.Show.Show (Numeric.Wavelet.Continuous.CWD v n m a)
+instance GHC.Show.Show (v a) => GHC.Show.Show (Numeric.Wavelet.Continuous.CWDLine v n a)
