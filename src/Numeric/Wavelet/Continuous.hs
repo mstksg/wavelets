@@ -76,7 +76,7 @@ cwd minS maxS xs = CWD . VG.generate $ \i ->
   where
     n = natVal (Proxy @n)
     m = natVal (Proxy @m)
-    maxScale = fromIntegral maxS `min` (fromIntegral n / (3 * sqrt 2))
+    maxScale = fromIntegral maxS `min` (fromIntegral n / (2 * sqrt 2))
     minScale = fromIntegral minS `max` 1
     scaleStep = (log maxScale - log minScale) / (fromIntegral m - 1)
     scaleOf :: Finite m -> a
