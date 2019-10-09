@@ -23,25 +23,20 @@ module Numeric.Wavelet.Continuous (
   , CWDLine(..)
   , cwd
   , AWavelet(..)
-  , morlet_
-  , meyer_
-  -- , renderWavelet
+  , morlet
+  , meyer
   ) where
 
-import           Control.Monad
 import           Data.Complex
 import           Data.Finite
 import           Data.Maybe
 import           Data.Proxy
-import           Data.Semigroup
 import           Data.Type.Equality
 import           Data.Vector.Generic.Sized    (Vector)
-import           Debug.Trace
 import           GHC.TypeLits.Compare
 import           GHC.TypeNats
 import           Math.FFT.Base
 import           Numeric.Wavelet.Internal.FFT
-import qualified Data.Vector                  as UV
 import qualified Data.Vector.Generic          as UVG
 import qualified Data.Vector.Generic.Sized    as VG
 import qualified Data.Vector.Sized            as V
@@ -102,11 +97,11 @@ data AWavelet v a = AW
     , awRange  :: a
     }
 
-morlet_
+morlet
     :: (UVG.Vector v a, RealFloat a)
     => a
     -> AWavelet v a
-morlet_ σ = AW{..}
+morlet σ = AW{..}
   where
     awRange  = 4
     awVector = renderFunc awRange $ \t ->
@@ -115,8 +110,8 @@ morlet_ σ = AW{..}
     σ2       = σ * σ
     awFreq   = flip (converge 20) σ $ \q -> σ / (1 - exp (-σ * q))
 
-meyer_ :: (UVG.Vector v a, RealFloat a) => AWavelet v a
-meyer_ = AW{..}
+meyer :: (UVG.Vector v a, RealFloat a) => AWavelet v a
+meyer = AW{..}
   where
     awRange = 6
     -- https://arxiv.org/ftp/arxiv/papers/1502/1502.00161.pdf
@@ -136,21 +131,6 @@ meyer_ = AW{..}
       in  if isNaN ψ || isInfinite ψ then 0 else ψ
     awFreq = 4 * pi / 3
 
--- -- TODO: check if mutable vectors helps at all
--- desingularize :: (UVG.Vector v a, RealFloat a) => v a -> v a
--- desingularize xs = UVG.imap go xs
---   where
---     go i x
---       | isBad x   = if nn > 0 then ns / nn else 0
---       | otherwise = x
---       where
---         (Sum ns, Sum nn) = (foldMap . foldMap) (\y -> (Sum y, Sum 1))
---           [ mfilter (not . isBad) $ xs UVG.!? (i - 1)
---           , mfilter (not . isBad) $ xs UVG.!? (i + 1)
---           ]
---     isBad x = isNaN x || isInfinite x
-
-
 -- | Render the effective range of a wavelet (based on 'awRange'), centered
 -- around zero.  Takes a timestep.
 renderFunc
@@ -163,35 +143,6 @@ renderFunc r f dt = UVG.generate (round n) $ \i ->
     f (fromIntegral i * dt - r)
   where
     n  = r * 2 / dt
-
--- morlet :: RealFloat a => a -> a -> Complex a
--- morlet σ t = (c * exp(-t*t/2) :+ 0) * ( exp (0 :+ σ * t) - (exp (-σ * σ/2) :+ 0))
---   where
---     c = pi ** (-1/4) * (1 + exp (-σ * σ) - 2 * exp (-3/4*σ*σ)) ** (-1/2)
-
--- meyer :: RealFloat a => a -> a
--- meyer t = (sin (2 * pi * t) - sin (pi * t)) / pi / t
-
--- -- | Morelet wavelet from -4 to 4, normalized to dt.
--- morlet :: forall v n a. (UVG.Vector v a, KnownNat n, Floating a) => Vector v n a
--- morlet = VG.generate $ \i -> f (fromIntegral i * dt - 4) * dt
---   where
---     dt = 8 / fromIntegral (natVal (Proxy @n) - 1)
---     f x = exp(-x*x/2) * cos(5*x)
-
--- morletScaled :: forall v n a p. (UVG.Vector v a, KnownNat n, Floating a) => p n -> Vector v (8 * n) a
--- morletScaled _ = morlet
-
--- morlet :: RealFloat a => a -> a -> Complex a
--- morlet σ t = ((c * (pi ** (-4)) * exp (- t**2 / 2)) :+ 0)
---            * (exp (0 :+ σ * t) - (κ :+ 0))
---   where
---     σ2 = σ ** 2
---     c = (1 + exp (- σ2) - 2 * exp (- 3 / 4 * σ2)) ** (-1/2)
---     κ = exp (-σ2/2)
-
--- morseF :: (UVG.Vector v a, KnownNat n, Floating a) => a -> a -> a -> Vector v n a
--- morseF dω p γ = VG.generate $ \((* dω) . fromIntegral->ω) -> ω ** (p*p/γ) * exp (- (ω ** γ))
 
 convolve
     :: forall v n m a.
@@ -208,20 +159,6 @@ convolve x y = VG.map realPart . ifft $ fft x' * fft y'
   where
     x' = ((:+ 0) `VG.map` x) VG.++ 0
     y' = ((:+ 0) `VG.map` y) VG.++ 0
-
--- convolve
---     :: forall v n m a. (KnownNat n, KnownNat m, UVG.Vector v a, Num a, 1 <= n + m)
---     => Vector v n a
---     -> Vector v m a
---     -> Vector v (n + m - 1) a
--- convolve x y = VG.generate $ \i -> sum $ map (go i) finites
-  -- where
-    -- go  :: Finite (n + m - 1) -> Finite n -> a
-    -- go n k
-    --   | Right j <- sub n k
-    --   , Just l  <- strengthenN j
-    --   = x `VG.index` k * y `VG.index` l
-    --   | otherwise = 0
 
 converge
     :: (Fractional a, Ord a)
