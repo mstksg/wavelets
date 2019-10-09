@@ -1,6 +1,6 @@
 {-# LANGUAGE FlexibleContexts #-}
 
-module Numeric.Wavelet.Internal (
+module Numeric.Wavelet.Internal.FFT (
     fft
   , ifft
   ) where
