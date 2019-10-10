@@ -79,7 +79,7 @@ cwd AW{..} minS maxS xs = CWD . VG.generate $ \i ->
                      coi = fromMaybe maxBound . packFinite . round $ sqrt 2 * s
                      ys' :: Vector v n a
                      ys' = VG.slice @_ @((q - 1)`Div`2) @n @((q-1)-((q-1)`Div`2)) Proxy ys
-                 in  CWDLine ys' (round s) (recip (awFreq * s)) coi
+                 in  CWDLine ys' (round s) (awFreq / s) coi
             _ -> error "bad wavelet"
   where
     n = natVal (Proxy @n)
