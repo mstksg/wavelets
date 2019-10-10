@@ -105,10 +105,11 @@ morlet σ = AW{..}
   where
     awRange  = 4
     awVector = renderFunc awRange $ \t ->
-      realPart $ (c * exp(-t*t/2) :+ 0) * ( exp (0 :+ σ * t) - (exp (-σ2/2) :+ 0))
-    c        = pi ** (-1/4) * (1 + exp (-σ2) - 2 * exp (-3/4*σ2)) ** (-1/2)
-    σ2       = σ * σ
-    awFreq   = flip (converge 20) σ $ \q -> σ / (1 - exp (-σ * q))
+      c * exp(-t*t/2) * (sin (σ * t) - exp (-σ2/2))
+    c      = pi ** (-1/4) * (1 + exp (-σ2) - 2 * exp (-3/4*σ2)) ** (-1/2)
+    σ2     = σ * σ
+    awFreq = converge 20 iter σ / (2 * pi)
+    iter q = σ / (1 - exp (-σ * q))
 
 meyer :: (UVG.Vector v a, RealFloat a) => AWavelet v a
 meyer = AW{..}
