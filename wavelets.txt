@@ -42,6 +42,9 @@ CWDLine :: Vector v n b -> Finite ((n `Div` 2) + 1) -> a -> Finite ((n `Div` 2) 
 --   side.
 [cwdlCoI] :: CWDLine v n a b -> Finite ((n `Div` 2) + 1)
 mapCWDLine :: (Vector v b, Vector v c) => (b -> c) -> CWDLine v n a b -> CWDLine v n a c
+data LNorm
+L1 :: LNorm
+L2 :: LNorm
 data CWDOpts n
 CWDO :: LNorm -> Finite ((n `Div` 2) + 1) -> Finite ((n `Div` 2) + 1) -> CWDOpts n
 
