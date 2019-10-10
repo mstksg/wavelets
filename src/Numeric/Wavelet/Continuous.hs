@@ -88,7 +88,7 @@ defaultCWDO :: KnownNat n => CWDOpts n
 defaultCWDO = CWDO
     { cwdoNorm     = L1
     , cwdoMinScale = minBound
-    , cwdoMaxScale = minBound
+    , cwdoMaxScale = maxBound
     }
 
 -- | 'cwd' for complex-valued analytic wavelets.
@@ -126,7 +126,9 @@ cwd AW{..} CWDO{..} xs = CWD . VG.generate $ \i ->
       L1 -> sqrt
       L2 -> id
     minScale = fromIntegral cwdoMinScale `max` 1
-    maxScale = fromIntegral cwdoMaxScale `min` (fromIntegral n / (2 * sqrt 2))
+    maxScale = fromIntegral cwdoMaxScale
+         `min` (fromIntegral n / (2 * sqrt 2))
+         `min` (minScale + 1)
     scaleStep = (log maxScale - log minScale) / (fromIntegral m - 1)
     scaleOf :: Finite m -> a
     scaleOf i = exp $ log minScale + fromIntegral i * scaleStep
