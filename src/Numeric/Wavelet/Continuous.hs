@@ -23,8 +23,8 @@ module Numeric.Wavelet.Continuous (
   , CWDLine(..)
   , cwd
   , AWavelet(..)
-  , morlet
-  , meyer
+  , morlet_
+  , meyer_
   ) where
 
 import           Data.Complex
@@ -48,7 +48,7 @@ newtype CWD v n m a = CWD { cwdLines :: V.Vector m (CWDLine v n a) }
 data CWDLine v n a = CWDLine
     { cwdlData  :: Vector v n a
     , cwdlScale :: Finite (n `Div` 2 + 1) -- ^ Scale factor, in number of ticks.
-    , cwdFreq   :: a                      -- ^ The frequency associated with this scale, in inverse tick
+    , cwdlFreq  :: a                      -- ^ The frequency associated with this scale, in inverse tick
     , cwdlCoI   :: Finite (n `Div` 2 + 1) -- ^ How many items are /outside/ of the Cone of Influence, on each side.
     }
   deriving Show
@@ -75,7 +75,7 @@ cwd AW{..} minS maxS xs = CWD . VG.generate $ \i ->
               | Just Refl <- isLE (Proxy @1) (Proxy @q)
               , Just Refl <- isLE (Proxy @((q-1)`Div`2)) (Proxy @(q-1))
               -> let ys :: Vector v (n + q - 1) a
-                     ys  = convolve xs wv
+                     ys  = (* sqrt dt) `VG.map` convolve xs wv   -- rescale
                      coi = fromMaybe maxBound . packFinite . round $ sqrt 2 * s
                      ys' :: Vector v n a
                      ys' = VG.slice @_ @((q - 1)`Div`2) @n @((q-1)-((q-1)`Div`2)) Proxy ys
@@ -97,11 +97,11 @@ data AWavelet v a = AW
     , awRange  :: a
     }
 
-morlet
+morlet_
     :: (UVG.Vector v a, RealFloat a)
     => a
     -> AWavelet v a
-morlet σ = AW{..}
+morlet_ σ = AW{..}
   where
     awRange  = 4
     awVector = renderFunc awRange $ \t ->
@@ -110,8 +110,8 @@ morlet σ = AW{..}
     σ2       = σ * σ
     awFreq   = flip (converge 20) σ $ \q -> σ / (1 - exp (-σ * q))
 
-meyer :: (UVG.Vector v a, RealFloat a) => AWavelet v a
-meyer = AW{..}
+meyer_ :: (UVG.Vector v a, RealFloat a) => AWavelet v a
+meyer_ = AW{..}
   where
     awRange = 6
     -- https://arxiv.org/ftp/arxiv/papers/1502/1502.00161.pdf
@@ -131,6 +131,21 @@ meyer = AW{..}
       in  if isNaN ψ || isInfinite ψ then 0 else ψ
     awFreq = 4 * pi / 3
 
+-- -- TODO: check if mutable vectors helps at all
+-- desingularize :: (UVG.Vector v a, RealFloat a) => v a -> v a
+-- desingularize xs = UVG.imap go xs
+--   where
+--     go i x
+--       | isBad x   = if nn > 0 then ns / nn else 0
+--       | otherwise = x
+--       where
+--         (Sum ns, Sum nn) = (foldMap . foldMap) (\y -> (Sum y, Sum 1))
+--           [ mfilter (not . isBad) $ xs UVG.!? (i - 1)
+--           , mfilter (not . isBad) $ xs UVG.!? (i + 1)
+--           ]
+--     isBad x = isNaN x || isInfinite x
+
+
 -- | Render the effective range of a wavelet (based on 'awRange'), centered
 -- around zero.  Takes a timestep.
 renderFunc
@@ -143,6 +158,27 @@ renderFunc r f dt = UVG.generate (round n) $ \i ->
     f (fromIntegral i * dt - r)
   where
     n  = r * 2 / dt
+
+-- morlet :: RealFloat a => a -> a -> Complex a
+-- morlet σ t = (c * exp(-t*t/2) :+ 0) * ( exp (0 :+ σ * t) - (exp (-σ * σ/2) :+ 0))
+--   where
+--     c = pi ** (-1/4) * (1 + exp (-σ * σ) - 2 * exp (-3/4*σ*σ)) ** (-1/2)
+
+-- meyer :: RealFloat a => a -> a
+-- meyer t = (sin (2 * pi * t) - sin (pi * t)) / pi / t
+
+-- -- | Morelet wavelet from -4 to 4, normalized to dt.
+-- morlet :: forall v n a. (UVG.Vector v a, KnownNat n, Floating a) => Vector v n a
+-- morlet = VG.generate $ \i -> f (fromIntegral i * dt - 4) * dt
+--   where
+--     dt = 8 / fromIntegral (natVal (Proxy @n) - 1)
+--     f x = exp(-x*x/2) * cos(5*x)
+
+-- morletScaled :: forall v n a p. (UVG.Vector v a, KnownNat n, Floating a) => p n -> Vector v (8 * n) a
+-- morletScaled _ = morlet
+
+-- morseF :: (UVG.Vector v a, KnownNat n, Floating a) => a -> a -> a -> Vector v n a
+-- morseF dω p γ = VG.generate $ \((* dω) . fromIntegral->ω) -> ω ** (p*p/γ) * exp (- (ω ** γ))
 
 convolve
     :: forall v n m a.
