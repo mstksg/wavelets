@@ -1,5 +1,6 @@
 {-# LANGUAGE BangPatterns                             #-}
 {-# LANGUAGE DeriveFunctor                            #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts                         #-}
 {-# LANGUAGE GADTs                                    #-}
 {-# LANGUAGE KindSignatures                           #-}
@@ -23,12 +24,13 @@ module Numeric.Wavelet.Continuous (
   -- * Continuous Wavelet Transform
     CWD(..), mapCWD
   , CWDLine(..), mapCWDLine
+  , CWDOpts(..), defaultCWDO
   , cwd
   , cwdReal
   -- * Wavelets
   , AWavelet(..), mapAWavelet
   , morlet, morletFunc
-  , meyer, meyerComplex, meyerFunc
+  , meyer, meyerFunc
   ) where
 
 import           Data.Complex
@@ -37,6 +39,7 @@ import           Data.Maybe
 import           Data.Proxy
 import           Data.Type.Equality
 import           Data.Vector.Generic.Sized    (Vector)
+import           GHC.Generics                 (Generic)
 import           GHC.TypeLits.Compare
 import           GHC.TypeNats
 import           Math.FFT.Base
@@ -71,6 +74,23 @@ mapCWD
     -> CWD v n m a c
 mapCWD f (CWD l) = CWD (mapCWDLine f <$> l)
 
+data LNorm = L1 | L2
+  deriving (Show, Eq, Ord, Enum, Bounded, Generic)
+
+data CWDOpts n = CWDO
+    { cwdoNorm     :: LNorm                     -- ^ wavelet normalization
+    , cwdoMinScale :: Finite (n `Div` 2 + 1)    -- ^ min scale (period)
+    , cwdoMaxScale :: Finite (n `Div` 2 + 1)    -- ^ max scale (period)
+    }
+  deriving (Show, Eq, Ord, Generic)
+
+defaultCWDO :: KnownNat n => CWDOpts n
+defaultCWDO = CWDO
+    { cwdoNorm     = L1
+    , cwdoMinScale = minBound
+    , cwdoMaxScale = minBound
+    }
+
 -- | 'cwd' for complex-valued analytic wavelets.
 cwd :: forall v n m a b.
      ( UVG.Vector v (Complex b)
@@ -81,11 +101,10 @@ cwd :: forall v n m a b.
      , RealFloat a
      )
     => AWavelet v a (Complex b)
-    -> Finite (n `Div` 2 + 1)         -- ^ minimum scale (period)
-    -> Finite (n `Div` 2 + 1)         -- ^ maximum scale (period)
+    -> CWDOpts n
     -> Vector v n (Complex b)
     -> CWD v n m a (Complex b)
-cwd AW{..} minS maxS xs = CWD . VG.generate $ \i ->
+cwd AW{..} CWDO{..} xs = CWD . VG.generate $ \i ->
       let s   = scaleOf i
           dt  = 1/s
       in  case awVector dt of
@@ -93,7 +112,7 @@ cwd AW{..} minS maxS xs = CWD . VG.generate $ \i ->
               | Just Refl <- isLE (Proxy @1) (Proxy @q)
               , Just Refl <- isLE (Proxy @((q-1)`Div`2)) (Proxy @(q-1))
               -> let ys :: Vector v (n + q - 1) (Complex b)
-                     ys  = (* (realToFrac dt :+ 0)) `VG.map` convolve xs wv   -- rescale
+                     ys  = (* (realToFrac (normie dt) :+ 0)) `VG.map` convolve xs wv
                      coi = fromMaybe maxBound . packFinite . round $ sqrt 2 * s
                      ys' :: Vector v n (Complex b)
                      ys' = VG.slice @_ @((q - 1)`Div`2) @n @((q-1)-((q-1)`Div`2)) Proxy ys
@@ -102,8 +121,12 @@ cwd AW{..} minS maxS xs = CWD . VG.generate $ \i ->
   where
     n = natVal (Proxy @n)
     m = natVal (Proxy @m)
-    maxScale = fromIntegral maxS `min` (fromIntegral n / (2 * sqrt 2))
-    minScale = fromIntegral minS `max` 1
+    normie :: a -> a
+    normie = case cwdoNorm of
+      L1 -> sqrt
+      L2 -> id
+    minScale = fromIntegral cwdoMinScale `max` 1
+    maxScale = fromIntegral cwdoMaxScale `min` (fromIntegral n / (2 * sqrt 2))
     scaleStep = (log maxScale - log minScale) / (fromIntegral m - 1)
     scaleOf :: Finite m -> a
     scaleOf i = exp $ log minScale + fromIntegral i * scaleStep
@@ -120,21 +143,21 @@ cwdReal
      , RealFloat a
      )
     => AWavelet v a b
-    -> Finite (n `Div` 2 + 1)         -- ^ minimum scale (period)
-    -> Finite (n `Div` 2 + 1)         -- ^ maximum scale (period)
+    -> CWDOpts n
     -> Vector v n b
     -> CWD v n m a b
-cwdReal aw minS maxS = mapCWD magnitude
-                     . cwd (mapAWavelet (:+ 0) aw) minS maxS
-                     . VG.map (:+ 0)
+cwdReal aw cwdo = mapCWD realPart
+                . cwd (mapAWavelet (:+ 0) aw) cwdo
+                . VG.map (:+ 0)
 
 -- | Analytical Wavelet
 data AWavelet v a b = AW
     { awVector :: a -> v b    -- ^ generate a vector within awRange with a given dt
-    , awFreq   :: a
-    , awRange  :: a
+    , awFreq   :: a           -- ^ Dominant frequency component
+    , awRange  :: a           -- ^ range away from zero outside of which wavelet can be considered negligible
     }
   deriving Functor
+-- TODO: add spread for COI
 
 mapAWavelet
     :: (UVG.Vector v b, UVG.Vector v c)
@@ -174,15 +197,6 @@ meyer = AW{..}
    awVector = renderFunc awRange meyerFunc
    awFreq   = 4 * pi / 3
 
-meyerComplex
-    :: (UVG.Vector v (Complex a), RealFloat a)
-    => AWavelet v a (Complex a)
-meyerComplex = AW{..}
-  where
-   awRange  = 6
-   awVector = renderFunc awRange ((:+ 0) . meyerFunc)
-   awFreq   = 4 * pi / 3
-
 meyerFunc :: RealFloat a => a -> a
 meyerFunc t
     | isNaN ψ || isInfinite ψ = 0
@@ -197,43 +211,23 @@ meyerFunc t
        / (t' - 64/9 * t'3)
     ψ = ψ1 + ψ2
 
-
---meyer :: (UVG.Vector v a, RealFloat a) => AWavelet v a
---meyer = AW{..}
---  where
-
---    awRange = 6
---    -- https://arxiv.org/ftp/arxiv/papers/1502/1502.00161.pdf
---    -- Close expressions for Meyer Wavelet and Scale Function
---    -- Valenzuela, V., de Oliveira, H.M.
---    --
---    -- we set singular points to 0 which shouldn't be bad if dt small
---    awVector = renderFunc awRange $ \t ->
---      let t' = t - 0.5
---          t'3 = t'**3
---          sinTerm = sin(4*pi/3*t') / pi
---          ψ1 = (4/3/pi*t'*cos(2*pi/3*t') - sinTerm)
---             / (t' - 16/9 * t'3)
---          ψ2 = (8/3/pi*t'*cos(8*pi/3*t') + sinTerm)
---             / (t' - 64/9 * t'3)
---          ψ = ψ1 + ψ2
---      in  if isNaN ψ || isInfinite ψ then 0 else ψ
---    awFreq = 4 * pi / 3
-
--- -- TODO: check if mutable vectors helps at all
--- desingularize :: (UVG.Vector v a, RealFloat a) => v a -> v a
--- desingularize xs = UVG.imap go xs
+-- fbsp
+--     :: (UVG.Vector v a, RealFloat a)
+--     => Int      -- ^ m, >= 1
+--     -> a        -- ^ f_b, bandwidth
+--     -> a        -- ^ f_c, wavelet center frequency
+--     -> AWavelet v a (Complex a)
+-- fbsp m fb fc = AW{..}
 --   where
---     go i x
---       | isBad x   = if nn > 0 then ns / nn else 0
---       | otherwise = x
---       where
---         (Sum ns, Sum nn) = (foldMap . foldMap) (\y -> (Sum y, Sum 1))
---           [ mfilter (not . isBad) $ xs UVG.!? (i - 1)
---           , mfilter (not . isBad) $ xs UVG.!? (i + 1)
---           ]
---     isBad x = isNaN x || isInfinite x
+--     awRange  = 4/fb
+--     awVector = renderFunc awRange (fbspFunc m fb fc)
+--     awFreq   = fc
 
+-- fbspFunc :: RealFloat a => Int -> a -> a -> a -> Complex a
+-- fbspFunc m fb fc t =
+--     ((sqrt fb * sinc (fb * t / fromIntegral m))^m :+ 0) * exp (0 :+ (2 * pi * fc * t))
+--   where
+--     sinc x = sin x / x
 
 -- | Render the effective range of a wavelet (based on 'awRange'), centered
 -- around zero.  Takes a timestep.
