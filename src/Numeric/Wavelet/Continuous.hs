@@ -23,8 +23,8 @@ module Numeric.Wavelet.Continuous (
   , CWDLine(..)
   , cwd
   , AWavelet(..)
-  , morlet_
-  , meyer_
+  , morlet
+  , meyer
   ) where
 
 import           Data.Complex
@@ -75,11 +75,11 @@ cwd AW{..} minS maxS xs = CWD . VG.generate $ \i ->
               | Just Refl <- isLE (Proxy @1) (Proxy @q)
               , Just Refl <- isLE (Proxy @((q-1)`Div`2)) (Proxy @(q-1))
               -> let ys :: Vector v (n + q - 1) a
-                     ys  = (* sqrt dt) `VG.map` convolve xs wv   -- rescale
+                     ys  = (* dt) `VG.map` convolve xs wv   -- rescale
                      coi = fromMaybe maxBound . packFinite . round $ sqrt 2 * s
                      ys' :: Vector v n a
                      ys' = VG.slice @_ @((q - 1)`Div`2) @n @((q-1)-((q-1)`Div`2)) Proxy ys
-                 in  CWDLine ys' (round s) (awFreq * s) coi
+                 in  CWDLine ys' (round s) (recip (awFreq * s)) coi
             _ -> error "bad wavelet"
   where
     n = natVal (Proxy @n)
@@ -97,11 +97,11 @@ data AWavelet v a = AW
     , awRange  :: a
     }
 
-morlet_
+morlet
     :: (UVG.Vector v a, RealFloat a)
     => a
     -> AWavelet v a
-morlet_ σ = AW{..}
+morlet σ = AW{..}
   where
     awRange  = 4
     awVector = renderFunc awRange $ \t ->
@@ -110,8 +110,8 @@ morlet_ σ = AW{..}
     σ2       = σ * σ
     awFreq   = flip (converge 20) σ $ \q -> σ / (1 - exp (-σ * q))
 
-meyer_ :: (UVG.Vector v a, RealFloat a) => AWavelet v a
-meyer_ = AW{..}
+meyer :: (UVG.Vector v a, RealFloat a) => AWavelet v a
+meyer = AW{..}
   where
     awRange = 6
     -- https://arxiv.org/ftp/arxiv/papers/1502/1502.00161.pdf
