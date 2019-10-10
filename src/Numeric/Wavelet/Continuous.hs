@@ -1,6 +1,6 @@
 {-# LANGUAGE BangPatterns                             #-}
 {-# LANGUAGE DeriveFunctor                            #-}
-{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveGeneric                            #-}
 {-# LANGUAGE FlexibleContexts                         #-}
 {-# LANGUAGE GADTs                                    #-}
 {-# LANGUAGE KindSignatures                           #-}
@@ -86,7 +86,7 @@ data CWDOpts n = CWDO
 
 defaultCWDO :: KnownNat n => CWDOpts n
 defaultCWDO = CWDO
-    { cwdoNorm     = L1
+    { cwdoNorm     = L2
     , cwdoMinScale = minBound
     , cwdoMaxScale = maxBound
     }
