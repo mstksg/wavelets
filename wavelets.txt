@@ -52,7 +52,7 @@ AW :: (a -> v a) -> a -> a -> AWavelet v a
 [awVector] :: AWavelet v a -> a -> v a
 [awFreq] :: AWavelet v a -> a
 [awRange] :: AWavelet v a -> a
-morlet_ :: (Vector v a, RealFloat a) => a -> AWavelet v a
-meyer_ :: (Vector v a, RealFloat a) => AWavelet v a
+morlet :: (Vector v a, RealFloat a) => a -> AWavelet v a
+meyer :: (Vector v a, RealFloat a) => AWavelet v a
 instance (GHC.Show.Show a, GHC.Show.Show (v a)) => GHC.Show.Show (Numeric.Wavelet.Continuous.CWD v n m a)
 instance (GHC.Show.Show a, GHC.Show.Show (v a)) => GHC.Show.Show (Numeric.Wavelet.Continuous.CWDLine v n a)
