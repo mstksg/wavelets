@@ -1,11 +1,17 @@
-{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleContexts                         #-}
+{-# LANGUAGE GADTs                                    #-}
+{-# LANGUAGE TypeInType                               #-}
+{-# OPTIONS_GHC -fplugin GHC.TypeLits.KnownNat.Solver #-}
+{-# OPTIONS_GHC -fplugin GHC.TypeLits.Normalise       #-}
 
 module Numeric.Wavelet.Internal.FFT (
     fft
   , ifft
+  , convolve
   ) where
 
 import           Data.Complex
+import           GHC.TypeNats
 import qualified Data.Array.CArray         as CA
 import qualified Data.Array.IArray         as IA
 import qualified Data.Ix                   as Ix
@@ -43,3 +49,19 @@ toCA
     => v (Complex a)
     -> CA.CArray Int (Complex a)
 toCA v = IA.listArray (0, VG.length v - 1) (VG.toList v)
+
+-- | FFT-based convolution
+convolve
+    :: ( VG.Vector v (Complex a)
+       , KnownNat n, 1 <= n
+       , KnownNat m, 1 <= m
+       , FFT.FFTWReal a
+       )
+    => SVG.Vector v n (Complex a)
+    -> SVG.Vector v m (Complex a)
+    -> SVG.Vector v (n + m - 1) (Complex a)
+convolve x y = ifft $ fft x' * fft y'
+  where
+    x' = x SVG.++ 0
+    y' = y SVG.++ 0
+

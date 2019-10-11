@@ -31,11 +31,14 @@ module Numeric.Wavelet.Continuous (
   , AWavelet(..), mapAWavelet
   , morlet, morletFunc
   , meyer, meyerFunc
+  , fbsp, fbspFunc
   ) where
 
 import           Data.Complex
 import           Data.Finite
+import           Data.Foldable
 import           Data.Maybe
+import           Data.Ord
 import           Data.Proxy
 import           Data.Type.Equality
 import           Data.Vector.Generic.Sized    (Vector)
@@ -213,23 +216,35 @@ meyerFunc t
        / (t' - 64/9 * t'3)
     ψ = ψ1 + ψ2
 
--- fbsp
---     :: (UVG.Vector v a, RealFloat a)
---     => Int      -- ^ m, >= 1
---     -> a        -- ^ f_b, bandwidth
---     -> a        -- ^ f_c, wavelet center frequency
---     -> AWavelet v a (Complex a)
--- fbsp m fb fc = AW{..}
---   where
---     awRange  = 4/fb
---     awVector = renderFunc awRange (fbspFunc m fb fc)
---     awFreq   = fc
+fbsp
+    :: (UVG.Vector v (Complex a), FFTWReal a)
+    => Int      -- ^ m, >= 1
+    -> a        -- ^ f_b, bandwidth
+    -> a        -- ^ f_c, wavelet center frequency
+    -> AWavelet v a (Complex a)
+fbsp m fb fc = AW{..}
+  where
+    awRange  = 4/fb
+    awVector = renderFunc awRange (fbspFunc m fb fc)
+    awFreq   = autoDeriveFreq awRange awVector
 
--- fbspFunc :: RealFloat a => Int -> a -> a -> a -> Complex a
--- fbspFunc m fb fc t =
---     ((sqrt fb * sinc (fb * t / fromIntegral m))^m :+ 0) * exp (0 :+ (2 * pi * fc * t))
---   where
---     sinc x = sin x / x
+autoDeriveFreq
+    :: (UVG.Vector v (Complex a), FFTWReal a)
+    => a
+    -> (a -> v (Complex a))
+    -> a
+autoDeriveFreq r fv = case fv 0.001 of
+    VG.SomeSized v ->
+      let vv    = zip [1..] . map magnitude . VG.toList $ fft v
+          (i,_) = maximumBy (comparing snd) vv
+      in  fromInteger i / (r * 2)
+    _ -> error "bad vector"
+
+fbspFunc :: RealFloat a => Int -> a -> a -> a -> Complex a
+fbspFunc m fb fc t =
+    ((sqrt fb * sinc (fb * t / fromIntegral m))^m :+ 0) * exp (0 :+ (2 * pi * fc * t))
+  where
+    sinc x = sin x / x
 
 -- | Render the effective range of a wavelet (based on 'awRange'), centered
 -- around zero.  Takes a timestep.
@@ -247,20 +262,20 @@ renderFunc r f dt = UVG.generate (round n) $ \i ->
 -- morseF :: (UVG.Vector v a, KnownNat n, Floating a) => a -> a -> a -> Vector v n a
 -- morseF dω p γ = VG.generate $ \((* dω) . fromIntegral->ω) -> ω ** (p*p/γ) * exp (- (ω ** γ))
 
-convolve
-    :: forall v n m a.
-     ( UVG.Vector v (Complex a)
-     , KnownNat n, 1 <= n
-     , KnownNat m, 1 <= m
-     , FFTWReal a
-     )
-    => Vector v n (Complex a)
-    -> Vector v m (Complex a)
-    -> Vector v (n + m - 1) (Complex a)
-convolve x y = ifft $ fft x' * fft y'
-  where
-    x' = x VG.++ 0
-    y' = y VG.++ 0
+-- convolve
+--     :: forall v n m a.
+--      ( UVG.Vector v (Complex a)
+--      , KnownNat n, 1 <= n
+--      , KnownNat m, 1 <= m
+--      , FFTWReal a
+--      )
+--     => Vector v n (Complex a)
+--     -> Vector v m (Complex a)
+--     -> Vector v (n + m - 1) (Complex a)
+-- convolve x y = ifft $ fft x' * fft y'
+--   where
+--     x' = x VG.++ 0
+--     y' = y VG.++ 0
 
 converge
     :: (Fractional a, Ord a)
