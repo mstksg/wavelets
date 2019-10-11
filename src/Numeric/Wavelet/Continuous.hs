@@ -113,11 +113,12 @@ cwd AW{..} CWDO{..} xs = CWD . VG.generate $ \i ->
               , Just Refl <- isLE (Proxy @((q-1)`Div`2)) (Proxy @(q-1))
               -> let ys :: Vector v (n + q - 1) (Complex b)
                      ys  = (* (realToFrac (normie dt) :+ 0)) `VG.map` convolve xs wv
-                     coi = fromMaybe maxBound . packFinite . round $ sqrt 2 * s
+                     coi = fromMaybe maxBound . packFinite . round @a @Integer $ sqrt 2 * s
+                     s'  = fromMaybe maxBound . packFinite . round @a @Integer $ s
                      ys' :: Vector v n (Complex b)
                      ys' = VG.slice @_ @((q - 1)`Div`2) @n @((q-1)-((q-1)`Div`2)) Proxy ys
-                 in  CWDLine ys' (round s) (awFreq / s) coi
-            _ -> error "bad wavelet"
+                 in  CWDLine ys' s' (awFreq / s) coi
+            _ -> error "Bad scale: wavelet vector is empty?"
   where
     n = natVal (Proxy @n)
     m = natVal (Proxy @m)
