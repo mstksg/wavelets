@@ -162,7 +162,6 @@ data AWavelet v a b = AW
     , awRange  :: a           -- ^ range away from zero outside of which wavelet can be considered negligible
     }
   deriving Functor
--- TODO: add spread for COI
 
 mapAWavelet
     :: (UVG.Vector v b, UVG.Vector v c)
@@ -258,24 +257,6 @@ renderFunc r f dt = UVG.generate (round n) $ \i ->
     f (fromIntegral i * dt - r)
   where
     n  = r * 2 / dt
-
--- morseF :: (UVG.Vector v a, KnownNat n, Floating a) => a -> a -> a -> Vector v n a
--- morseF dω p γ = VG.generate $ \((* dω) . fromIntegral->ω) -> ω ** (p*p/γ) * exp (- (ω ** γ))
-
--- convolve
---     :: forall v n m a.
---      ( UVG.Vector v (Complex a)
---      , KnownNat n, 1 <= n
---      , KnownNat m, 1 <= m
---      , FFTWReal a
---      )
---     => Vector v n (Complex a)
---     -> Vector v m (Complex a)
---     -> Vector v (n + m - 1) (Complex a)
--- convolve x y = ifft $ fft x' * fft y'
---   where
---     x' = x VG.++ 0
---     y' = y VG.++ 0
 
 converge
     :: (Fractional a, Ord a)

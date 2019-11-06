@@ -9,6 +9,8 @@ module Numeric.Wavelet.Internal.FFT (
     fft
   , ifft
   , convolve
+  , rconvolve
+  , FFT.FFTWReal
   ) where
 
 import           Data.Complex
@@ -66,3 +68,15 @@ convolve x y = ifft $ fft x' * fft y'
     x' = x SVG.++ 0
     y' = y SVG.++ 0
 
+-- | FFT-based real-valued convolution
+rconvolve
+    :: ( VG.Vector v (Complex a)
+       , VG.Vector v a
+       , KnownNat n, 1 <= n
+       , KnownNat m, 1 <= m
+       , FFT.FFTWReal a
+       )
+    => SVG.Vector v n a
+    -> SVG.Vector v m a
+    -> SVG.Vector v (n + m - 1) a
+rconvolve x y = SVG.map realPart $ convolve (SVG.map (:+ 0) x) (SVG.map (:+ 0) y)
